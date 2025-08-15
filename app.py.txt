@@ -1,0 +1,117 @@
+from flask import Flask, render_template, request, send_file
+import sqlite3
+from datetime import datetime
+from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer, Image
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import cm
+import os
+
+app = Flask(__name__)
+
+# Inicializar banco
+def init_db():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS solicitacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            solicitante TEXT,
+            peca TEXT,
+            quantidade INTEGER,
+            data TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+@app.route('/')
+def form():
+    return render_template('form.html')
+
+@app.route('/submit', methods=['POST'])
+def submit():
+    solicitante = request.form['solicitante']
+    peca = request.form['peca']
+    quantidade = request.form['quantidade']
+
+    # Salvar histórico
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO solicitacoes (solicitante, peca, quantidade, data) VALUES (?, ?, ?, ?)',
+                   (solicitante, peca, quantidade, datetime.now().strftime("%d/%m/%Y %H:%M")))
+    conn.commit()
+    conn.close()
+
+    # Gerar PDF na memória
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    style_title = styles['Heading1']
+    style_title.textColor = colors.HexColor('#ff6600')
+    style_title.alignment = 1
+    style_normal = styles['Normal']
+
+    # Logo
+    logo_path = 'static/logo.png'
+    if os.path.exists(logo_path):
+        img = Image(logo_path, width=4*cm, height=4*cm)
+        img.hAlign = 'CENTER'
+        elements.append(img)
+        elements.append(Spacer(1, 0.5*cm))
+
+    # Título
+    elements.append(Paragraph("Solicitação de Peça - LEÃO", style_title))
+    elements.append(Spacer(1, 1*cm))
+
+    # Tabela de dados
+    data_table = [
+        ['Campo', 'Informação'],
+        ['Data', datetime.now().strftime("%d/%m/%Y %H:%M")],
+        ['Solicitante', solicitante],
+        ['Peça', peca],
+        ['Quantidade', quantidade],
+        ['Setor', '________________']
+    ]
+    table = Table(data_table, colWidths=[5*cm, 10*cm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#ff6600')),
+        ('TEXTCOLOR',(0,0),(-1,0),colors.white),
+        ('ALIGN',(0,0),(-1,-1),'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 12),
+        ('BOTTOMPADDING', (0,0), (-1,0), 8),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 11),
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#fff5eb')),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 2*cm))
+
+    # Assinaturas
+    elements.append(Paragraph("Assinatura do Solicitante: ____________________________", style_normal))
+    elements.append(Spacer(1, 1*cm))
+    elements.append(Paragraph("Assinatura do Responsável: ____________________________", style_normal))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f'solicitacao_{solicitante}.pdf', mimetype='application/pdf')
+
+@app.route('/admin')
+def admin():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM solicitacoes ORDER BY id DESC')
+    solicitacoes = cursor.fetchall()
+    conn.close()
+    return render_template('admin.html', solicitacoes=solicitacoes)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)

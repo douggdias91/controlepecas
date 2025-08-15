@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel Administrativo - LEÃO</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f7f7f7; }
+        header { background-color: #ff6600; color: white; padding: 20px; text-align: center; }
+        .container { max-width: 900px; margin: 30px auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        th { background-color: #ff6600; color: white; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Painel Administrativo - LEÃO</h1>
+    </header>
+    <div class="container">
+        <h2>Histórico de Solicitações</h2>
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Data</th>
+                <th>Solicitante</th>
+                <th>Peça</th>
+                <th>Quantidade</th>
+            </tr>
+            {% for row in solicitacoes %}
+            <tr>
+                <td>{{ row[0] }}</td>
+                <td>{{ row[4] }}</td>
+                <td>{{ row[1] }}</td>
+                <td>{{ row[2] }}</td>
+                <td>{{ row[3] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
